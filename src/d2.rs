@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 fn parse_ranges(input: &str) -> Vec<(u64, u64)> {
     let mut ranges = vec![];
     for range_str in input.split(',') {
@@ -22,34 +20,27 @@ fn parse_ranges(input: &str) -> Vec<(u64, u64)> {
 }
 
 fn invalid_part_2(input: &str) -> bool {
-    let chars: Vec<char> = input.chars().collect();
+    let chars = input.as_bytes();
+    let half = input.len() / 2;
+    let first_half = &chars[0..half];
 
-    for size in 1..=input.len() / 2 {
-        'window: for window in chars.windows(size) {
-            if window.starts_with(&['0']) {
+    for size in 1..=half {
+        if input.len() % size != 0 {
+            continue;
+        }
+        'window: for window in first_half.windows(size) {
+            if window.starts_with(b"0") {
                 continue;
             }
 
             for chunk in chars.chunks(size) {
                 if window != chunk {
-                    // println!("no match chunk={chunk:?} against window={window:?}");
                     continue 'window;
                 }
             }
-
-            // println!("all match input={input} using window={window:?}");
             return true;
-            // let pattern: String = window.iter().collect();
-            // let mut reconstructed = String::new();
-            // while reconstructed.len() < input.len() {
-            //     reconstructed.push_str(&pattern);
-            // }
-            // if reconstructed == input {
-            //     return true;
-            // }
         }
     }
-
     false
 }
 
