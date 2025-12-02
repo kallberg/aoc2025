@@ -21,12 +21,12 @@ fn parse_ranges(input: &str) -> Vec<RangeInclusive<u64>> {
     ranges
 }
 
-fn slice_u64(value: u64, index: u32, length: u32) -> u64 {
-    if value == 0 {
-        return 0;
-    }
+fn digit_len(value: u64) -> u32 {
+    value.checked_ilog10().unwrap_or(0) + 1
+}
 
-    let digits = value.ilog10() + 1;
+fn slice_u64(value: u64, index: u32, length: u32) -> u64 {
+    let digits = digit_len(value);
 
     if index >= digits {
         return 0;
@@ -40,6 +40,15 @@ fn slice_u64(value: u64, index: u32, length: u32) -> u64 {
     }
 
     sliced
+}
+
+fn slice_middle(value: u64) -> (u64, u64) {
+    let digits = digit_len(value);
+    let half = digits / 2;
+
+    let left = slice_u64(value, 0, half);
+    let right = slice_u64(value, half, half);
+    (left, right)
 }
 
 fn invalid_part_2(input: u64) -> bool {
@@ -84,10 +93,9 @@ pub fn part_1(input: &str) -> String {
     let mut sum = 0;
     for range in parse_ranges(input) {
         for entry in range {
-            let entry_str = entry.to_string();
-            if entry_str.len() % 2 == 0 {
-                let (left, right) = entry_str.split_at(entry_str.len() / 2);
-                assert!(left.len() == right.len());
+            let digits = digit_len(entry);
+            if digits % 2 == 0 {
+                let (left, right) = slice_middle(entry);
                 if left == right {
                     sum += entry;
                 }
@@ -100,7 +108,15 @@ pub fn part_1(input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::d2::invalid_part_2;
+    use crate::d2::{invalid_part_2, slice_middle};
+
+    #[test]
+    fn test_slice_middle() {
+        assert_eq!(slice_middle(11), (1, 1));
+        assert_eq!(slice_middle(1111), (11, 11));
+        assert_eq!(slice_middle(110011), (110, 11));
+        assert_eq!(slice_middle(11011011), (1101, 1011));
+    }
 
     #[test]
     fn test_invalid_part_2() {
