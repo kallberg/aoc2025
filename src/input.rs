@@ -1,0 +1,5 @@
+pub const D1E: &str = include_str!("../input/1e.txt");
+pub const D2E: &str = include_str!("../input/2e.txt");
+
+pub const D1: &str = include_str!("../input/1.txt");
+pub const D2: &str = include_str!("../input/2.txt");
