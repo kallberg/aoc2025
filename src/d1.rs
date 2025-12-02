@@ -23,11 +23,11 @@ pub fn part_1(input_str: &str) -> String {
     let mut counter = 0;
 
     for line in input_str.lines() {
-        if line.len() == 0 {
+        if line.is_empty() {
             continue;
         }
         let Some((direction, distance)) = parse_instruction(line) else {
-            panic!("failed to parse line={}", line);
+            panic!("failed to parse line={line}");
         };
         match direction {
             false => dial -= distance as i32,
@@ -49,11 +49,11 @@ pub fn part_2(input_str: &str) -> String {
 
     for line in input_str.lines() {
         let prev = dial;
-        if line.len() == 0 {
+        if line.is_empty() {
             continue;
         }
         let Some((direction, distance)) = parse_instruction(line) else {
-            panic!("failed to parse line={}", line);
+            panic!("failed to parse line={line}");
         };
         let mod_distance = distance % 100;
         let rem_distance = distance - mod_distance;
@@ -70,12 +70,9 @@ pub fn part_2(input_str: &str) -> String {
             dial += 100;
         }
 
-        if dial == 0 {
-            counter += 1;
-        } else if prev != 0 && dial != unconstrained {
+        if dial == 0 || (prev != 0 && dial != unconstrained) {
             counter += 1;
         }
-
         counter += distance_revolutions;
     }
 
