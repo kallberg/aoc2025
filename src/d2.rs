@@ -1,4 +1,6 @@
-fn parse_ranges(input: &str) -> Vec<(u64, u64)> {
+use std::ops::RangeInclusive;
+
+fn parse_ranges(input: &str) -> Vec<RangeInclusive<u64>> {
     let mut ranges = vec![];
     for range_str in input.split(',') {
         let (left_str, right_str) = range_str
@@ -13,7 +15,7 @@ fn parse_ranges(input: &str) -> Vec<(u64, u64)> {
             .parse::<u64>()
             .unwrap_or_else(|_| panic!("parse right_str={right_str} to u64 failed"));
 
-        ranges.push((left, right));
+        ranges.push(left..=right);
     }
 
     ranges
@@ -27,12 +29,9 @@ fn invalid_part_2(input: &str) -> bool {
         if input.len() % size != 0 {
             continue;
         }
-        let mut pattern = None;
-        for needle in chars.chunks(size) {
-            let Some(pattern) = pattern else {
-                pattern = Some(needle);
-                continue;
-            };
+        let pattern = &chars[0..size];
+
+        for needle in chars[size..].chunks_exact(size) {
             if needle != pattern {
                 continue 'size;
             }
@@ -44,8 +43,8 @@ fn invalid_part_2(input: &str) -> bool {
 
 pub fn part_2(input: &str) -> String {
     let mut sum = 0;
-    for (start, end) in parse_ranges(input) {
-        for entry in start..=end {
+    for range in parse_ranges(input) {
+        for entry in range {
             let entry_str = entry.to_string();
             if invalid_part_2(&entry_str) {
                 sum += entry;
@@ -58,8 +57,8 @@ pub fn part_2(input: &str) -> String {
 
 pub fn part_1(input: &str) -> String {
     let mut sum = 0;
-    for (start, end) in parse_ranges(input) {
-        for entry in start..=end {
+    for range in parse_ranges(input) {
+        for entry in range {
             let entry_str = entry.to_string();
             if entry_str.len() % 2 == 0 {
                 let (left, right) = entry_str.split_at(entry_str.len() / 2);
