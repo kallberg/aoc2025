@@ -21,17 +21,43 @@ fn parse_ranges(input: &str) -> Vec<RangeInclusive<u64>> {
     ranges
 }
 
-fn invalid_part_2(input: &str) -> bool {
-    let chars = input.as_bytes();
-    let half = input.len() / 2;
+fn slice_u64(value: u64, index: u32, length: u32) -> u64 {
+    if value == 0 {
+        return 0;
+    }
+
+    let digits = value.ilog10() + 1;
+
+    if index >= digits {
+        return 0;
+    }
+
+    let drop_right = digits.saturating_sub(index + length);
+    let mut sliced = value / 10u64.pow(drop_right);
+
+    if length < digits {
+        sliced %= 10u64.pow(length);
+    }
+
+    sliced
+}
+
+fn invalid_part_2(input: u64) -> bool {
+    if input == 0 {
+        return false;
+    }
+
+    let digits = input.ilog10() + 1;
+    let half = digits / 2;
 
     'size: for size in 1..=half {
-        if input.len() % size != 0 {
+        if digits % size != 0 {
             continue;
         }
-        let pattern = &chars[0..size];
+        let pattern = slice_u64(input, 0, size);
 
-        for needle in chars[size..].chunks_exact(size) {
+        for index in (size..digits).step_by(size as usize) {
+            let needle = slice_u64(input, index, size);
             if needle != pattern {
                 continue 'size;
             }
@@ -45,8 +71,7 @@ pub fn part_2(input: &str) -> String {
     let mut sum = 0;
     for range in parse_ranges(input) {
         for entry in range {
-            let entry_str = entry.to_string();
-            if invalid_part_2(&entry_str) {
+            if invalid_part_2(entry) {
                 sum += entry;
             }
         }
@@ -79,20 +104,20 @@ mod tests {
 
     #[test]
     fn test_invalid_part_2() {
-        assert!(invalid_part_2("11"));
-        assert!(invalid_part_2("22"));
-        assert!(invalid_part_2("99"));
-        assert!(invalid_part_2("1010"));
-        assert!(invalid_part_2("1188511885"));
-        assert!(invalid_part_2("222222"));
-        assert!(invalid_part_2("446446"));
-        assert!(invalid_part_2("38593859"));
+        assert!(invalid_part_2(11));
+        assert!(invalid_part_2(22));
+        assert!(invalid_part_2(99));
+        assert!(invalid_part_2(1010));
+        assert!(invalid_part_2(1188511885));
+        assert!(invalid_part_2(222222));
+        assert!(invalid_part_2(446446));
+        assert!(invalid_part_2(38593859));
     }
 
     #[test]
     fn test_valid_part_2() {
         for value in 1698522..=1698528 {
-            assert!(!invalid_part_2(&value.to_string()));
+            assert!(!invalid_part_2(value));
         }
     }
 }
