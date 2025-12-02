@@ -22,24 +22,22 @@ fn parse_ranges(input: &str) -> Vec<(u64, u64)> {
 fn invalid_part_2(input: &str) -> bool {
     let chars = input.as_bytes();
     let half = input.len() / 2;
-    let first_half = &chars[0..half];
 
-    for size in 1..=half {
+    'size: for size in 1..=half {
         if input.len() % size != 0 {
             continue;
         }
-        'window: for window in first_half.windows(size) {
-            if window.starts_with(b"0") {
+        let mut pattern = None;
+        for needle in chars.chunks(size) {
+            let Some(pattern) = pattern else {
+                pattern = Some(needle);
                 continue;
+            };
+            if needle != pattern {
+                continue 'size;
             }
-
-            for chunk in chars.chunks(size) {
-                if window != chunk {
-                    continue 'window;
-                }
-            }
-            return true;
         }
+        return true;
     }
     false
 }
@@ -47,11 +45,9 @@ fn invalid_part_2(input: &str) -> bool {
 pub fn part_2(input: &str) -> String {
     let mut sum = 0;
     for (start, end) in parse_ranges(input) {
-        // println!("checking {start}..={end}");
         for entry in start..=end {
             let entry_str = entry.to_string();
             if invalid_part_2(&entry_str) {
-                // println!("{entry}");
                 sum += entry;
             }
         }
@@ -76,4 +72,28 @@ pub fn part_1(input: &str) -> String {
     }
 
     sum.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::d2::invalid_part_2;
+
+    #[test]
+    fn test_invalid_part_2() {
+        assert!(invalid_part_2("11"));
+        assert!(invalid_part_2("22"));
+        assert!(invalid_part_2("99"));
+        assert!(invalid_part_2("1010"));
+        assert!(invalid_part_2("1188511885"));
+        assert!(invalid_part_2("222222"));
+        assert!(invalid_part_2("446446"));
+        assert!(invalid_part_2("38593859"));
+    }
+
+    #[test]
+    fn test_valid_part_2() {
+        for value in 1698522..=1698528 {
+            assert!(!invalid_part_2(&value.to_string()));
+        }
+    }
 }
