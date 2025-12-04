@@ -26,23 +26,35 @@ fn roll_at(x: usize, y: usize, grid: &Grid) -> bool {
     *cell
 }
 
-fn adjacent_rolls(x: usize, y: usize, grid: &Grid) -> usize {
+fn adjacent(x: usize, y: usize) -> Vec<(usize, usize)> {
     let range_x = x.saturating_sub(1)..=(x + 1);
     let range_y = y.saturating_sub(1)..=(y + 1);
-    let mut counter = 0;
+    let mut values = vec![];
 
-    for a_y in range_y {
-        for a_x in range_x.clone() {
-            if x == a_x && y == a_y {
+    for r_y in range_y {
+        for r_x in range_x.clone() {
+            if r_y == y && r_x == x {
                 continue;
             }
-            if roll_at(a_x, a_y, grid) {
-                counter += 1;
-            }
+            values.push((r_x, r_y));
         }
     }
 
+    values
+}
+
+fn adjacent_rolls(x: usize, y: usize, grid: &Grid) -> usize {
+    let mut counter = 0;
+    for (x, y) in adjacent(x, y) {
+        if roll_at(x, y, grid) {
+            counter += 1;
+        }
+    }
     counter
+}
+
+fn removable(x: usize, y: usize, grid: &Grid) -> bool {
+    adjacent_rolls(x, y, grid) < 4
 }
 
 fn roll_char(roll: bool) -> char {
@@ -65,10 +77,8 @@ pub fn part_1(input: &str) -> String {
     let mut counter = 0;
 
     for (y, row) in grid.iter().enumerate() {
-        // println!("row={}", row_str(row));
         for (x, cell) in row.iter().enumerate() {
-            if *cell && adjacent_rolls(x, y, &grid) < 4 {
-                // println!("x={x}, y={y} => moveable");
+            if *cell && removable(x, y, &grid) {
                 counter += 1;
             }
         }
@@ -78,5 +88,35 @@ pub fn part_1(input: &str) -> String {
 }
 
 pub fn part_2(input: &str) -> String {
-    String::new()
+    let mut grid = parse_grid(input);
+    let mut counter = 0;
+
+    let mut queue = vec![];
+
+    for (y, row) in grid.iter().enumerate() {
+        for (x, cell) in row.iter().enumerate() {
+            if *cell {
+                queue.push((x, y));
+            }
+        }
+    }
+
+    loop {
+        let Some((x, y)) = queue.pop() else {
+            break;
+        };
+
+        if roll_at(x, y, &grid) && removable(x, y, &grid) {
+            counter += 1;
+            grid[y][x] = false;
+
+            for (x, y) in adjacent(x, y) {
+                if roll_at(x, y, &grid) {
+                    queue.push((x, y));
+                }
+            }
+        }
+    }
+
+    counter.to_string()
 }

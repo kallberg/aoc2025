@@ -12,7 +12,7 @@ fn main() {
     let d3_1 = d3::part_1(input::D3);
     let d3_2 = d3::part_2(input::D3);
     let d4_1 = d4::part_1(input::D4);
-    let d4_2 = d4::part_2(input::D4E);
+    let d4_2 = d4::part_2(input::D4);
 
     println!("{d1_1}");
     println!("{d1_2}");
