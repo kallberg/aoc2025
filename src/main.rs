@@ -2,6 +2,7 @@ mod d1;
 mod d2;
 mod d3;
 mod d4;
+mod d5;
 mod input;
 
 fn main() {
@@ -13,6 +14,8 @@ fn main() {
     let d3_2 = d3::part_2(input::D3);
     let d4_1 = d4::part_1(input::D4);
     let d4_2 = d4::part_2(input::D4);
+    let d5_1 = d5::part_1(input::D5);
+    let d5_2 = d5::part_2(input::D5);
 
     println!("{d1_1}");
     println!("{d1_2}");
@@ -22,4 +25,6 @@ fn main() {
     println!("{d3_2}");
     println!("{d4_1}");
     println!("{d4_2}");
+    println!("{d5_1}");
+    println!("{d5_2}");
 }
