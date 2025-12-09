@@ -1,3 +1,5 @@
+use rayon::prelude::*;
+
 type Point = (u64, u64);
 type Polygon = Vec<Point>;
 
@@ -37,18 +39,25 @@ fn max_area2(tiles: Vec<Point>) -> u64 {
     let mut max_found = 0;
 
     for a in 0..tiles.len() {
-        for b in (a + 1)..tiles.len() {
-            let tile_a = tiles[a];
-            let tile_b = tiles[b];
-            let value = area(tile_a, tile_b);
+        max_found = max_found.max(
+            ((a + 1)..tiles.len())
+                .into_par_iter()
+                .flat_map(|b| {
+                    let tile_a = tiles[a];
+                    let tile_b = tiles[b];
+                    let value = area(tile_a, tile_b);
 
-            if valid_rectangle(tile_a, tile_b, &tiles) {
-                println!("valid tile_a{tile_a:?} tile_b={tile_b:?}");
-                max_found = max_found.max(value);
-            } else {
-                println!("invalid tile_a{tile_a:?} tile_b={tile_b:?}");
-            }
-        }
+                    if valid_rectangle(tile_a, tile_b, &tiles) {
+                        println!("valid tile_a{tile_a:?} tile_b={tile_b:?}");
+                        Some(value)
+                    } else {
+                        println!("invalid tile_a{tile_a:?} tile_b={tile_b:?}");
+                        None
+                    }
+                })
+                .max()
+                .unwrap_or(0),
+        );
     }
 
     max_found
