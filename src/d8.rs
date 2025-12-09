@@ -2,17 +2,8 @@ type Circuit = Vec<usize>;
 
 type JunctionBox = (u64, u64, u64);
 
-fn absorb(from: &mut Circuit, to: &mut Circuit) {
-    to.extend(from.clone());
-    from.clear();
-}
-
-fn merge_circuits(a: &mut Circuit, b: &mut Circuit) {
-    if b.len() >= a.len() {
-        absorb(a, b);
-    } else {
-        absorb(b, a);
-    }
+fn merge(into: &mut Circuit, from: &Circuit) {
+    into.extend(from.clone());
 }
 
 fn distance_squared(a: JunctionBox, b: JunctionBox) -> u64 {
@@ -81,21 +72,19 @@ pub fn part_1(input: &str, max: usize) -> String {
 
     for pair in sorted {
         let (left, right) = pair;
-        let a_index = circuit_of(left, &circuits);
-        let b_index = circuit_of(right, &circuits);
+        let merge_into = circuit_of(left, &circuits);
+        let merge_from = circuit_of(right, &circuits);
 
-        if a_index == b_index {
+        if merge_into == merge_from {
             continue;
         }
 
-        let mut a = circuits[a_index].clone();
-        let mut b = circuits[b_index].clone();
+        let source = circuits[merge_from].clone();
+        let target = &mut circuits[merge_into];
 
-        println!("pair {left}, {right} is merging circuit {a_index} with {b_index}");
-        merge_circuits(&mut a, &mut b);
+        merge(target, &source);
 
-        circuits[a_index] = a;
-        circuits[b_index] = b;
+        circuits[merge_from].clear();
     }
 
     circuits.retain(|circuit| !circuit.is_empty());
@@ -103,19 +92,50 @@ pub fn part_1(input: &str, max: usize) -> String {
     circuits.reverse();
 
     let mut product = 1;
-    let circuit_count = circuits.len();
 
     for circuit in circuits.into_iter().take(3) {
         let value = circuit.len();
-        println!("size={value} {circuit:?}");
         product *= value;
     }
-
-    println!("total circuits: {circuit_count}");
 
     product.to_string()
 }
 
-pub fn part_2(_input: &str) -> String {
-    String::new()
+pub fn part_2(input: &str) -> String {
+    let boxes = parse_junction_boxes(input);
+    let circuit_count = boxes.len();
+    let sorted = id_pairs_sorted(boxes.clone());
+    let mut circuits = vec![];
+    let mut remaining: Vec<usize> = (0..circuit_count).collect();
+
+    for index in 0..circuit_count {
+        circuits.push(vec![index])
+    }
+
+    for pair in sorted {
+        let (left, right) = pair;
+        let merge_into = circuit_of(left, &circuits);
+        let merge_from = circuit_of(right, &circuits);
+
+        if merge_into == merge_from {
+            continue;
+        }
+
+        remaining.retain(|index| *index != merge_from);
+        let source = circuits[merge_from].clone();
+        let target = &mut circuits[merge_into];
+
+        merge(target, &source);
+
+        circuits[merge_from].clear();
+
+        if remaining.len() == 1 {
+            let box1 = &boxes[left];
+            let box2 = &boxes[right];
+            let product = box1.0 * box2.0;
+            return product.to_string();
+        }
+    }
+
+    String::from("0HN0!")
 }
