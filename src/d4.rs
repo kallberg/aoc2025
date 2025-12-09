@@ -57,21 +57,6 @@ fn removable(x: usize, y: usize, grid: &Grid) -> bool {
     adjacent_rolls(x, y, grid) < 4
 }
 
-fn roll_char(roll: bool) -> char {
-    match roll {
-        true => '@',
-        false => '.',
-    }
-}
-
-fn row_str(row: &Vec<bool>) -> String {
-    let mut string = String::new();
-    for value in row {
-        string.push(roll_char(*value));
-    }
-    string
-}
-
 pub fn part_1(input: &str) -> String {
     let grid = parse_grid(input);
     let mut counter = 0;

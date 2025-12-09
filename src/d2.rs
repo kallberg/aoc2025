@@ -60,7 +60,7 @@ fn invalid_part_2(input: u64) -> bool {
     let half = digits / 2;
 
     'size: for size in 1..=half {
-        if digits % size != 0 {
+        if !digits.is_multiple_of(size) {
             continue;
         }
         let pattern = slice_u64(input, 0, size);
@@ -94,7 +94,7 @@ pub fn part_1(input: &str) -> String {
     for range in parse_ranges(input) {
         for entry in range {
             let digits = digit_len(entry);
-            if digits % 2 == 0 {
+            if digits.is_multiple_of(2) {
                 let (left, right) = slice_middle(entry);
                 if left == right {
                     sum += entry;

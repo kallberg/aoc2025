@@ -1,7 +1,7 @@
-pub fn part_1(input: &str, max: usize) -> String {
+pub fn part_1(_input: &str, _max: usize) -> String {
     String::new()
 }
 
-pub fn part_2(input: &str) -> String {
+pub fn part_2(_input: &str) -> String {
     String::new()
 }

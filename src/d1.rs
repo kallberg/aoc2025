@@ -1,5 +1,5 @@
 fn parse_instruction(input_str: &str) -> Option<(bool, u32)> {
-    if input_str.len() < 1 {
+    if input_str.is_empty() {
         return None;
     }
 
