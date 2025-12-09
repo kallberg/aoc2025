@@ -48,10 +48,8 @@ fn max_area2(tiles: Vec<Point>) -> u64 {
                     let value = area(tile_a, tile_b);
 
                     if valid_rectangle(tile_a, tile_b, &tiles) {
-                        println!("valid tile_a{tile_a:?} tile_b={tile_b:?}");
                         Some(value)
                     } else {
-                        println!("invalid tile_a{tile_a:?} tile_b={tile_b:?}");
                         None
                     }
                 })
