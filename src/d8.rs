@@ -1,4 +1,4 @@
-pub fn part_1(input: &str) -> String {
+pub fn part_1(input: &str, max: usize) -> String {
     String::new()
 }
 
