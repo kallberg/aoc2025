@@ -1,5 +1,3 @@
-use std::u8;
-
 fn joltage_from_char(value: char) -> u64 {
     match value {
         '0' => 0,

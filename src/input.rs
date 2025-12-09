@@ -6,6 +6,7 @@ pub const D5E: &str = include_str!("../input/5e.txt");
 pub const D6E: &str = include_str!("../input/6e.txt");
 pub const D7E: &str = include_str!("../input/7e.txt");
 pub const D8E: &str = include_str!("../input/8e.txt");
+pub const D9E: &str = include_str!("../input/9e.txt");
 
 pub const D1: &str = include_str!("../input/1.txt");
 pub const D2: &str = include_str!("../input/2.txt");
@@ -15,3 +16,4 @@ pub const D5: &str = include_str!("../input/5.txt");
 pub const D6: &str = include_str!("../input/6.txt");
 pub const D7: &str = include_str!("../input/7.txt");
 pub const D8: &str = include_str!("../input/8.txt");
+pub const D9: &str = include_str!("../input/9.txt");
