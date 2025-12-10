@@ -3,7 +3,7 @@
 // 2. From 1. follows that there can be light diagram of at most size 10
 //
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 const BUTTON_MASK: [u64; 10] = [
     0b0000000001,
@@ -105,25 +105,16 @@ fn button_joltages(button: u64) -> Vec<usize> {
         .collect()
 }
 
-fn required_buttons(buttons: &[u64], requirement: &[u64]) -> Vec<(u64, usize)> {
-    for (index, count) in requirement.iter().enumerate() {
-        let mut providing_buttons = vec![];
-        for button in buttons {
-            for joltage in button_joltages(button) {}
-        }
-    }
-}
-
 fn joltage_alternatives(current: &[u64], buttons: &[u64], target: &[u64]) -> Vec<Vec<u64>> {
     let mut output = vec![];
 
-    for button in buttons {
+    'button: for button in buttons {
         let mut alternative: Vec<u64> = current.to_vec();
         for index in button_joltages(*button) {
             alternative[index] += 1;
             if alternative[index] > target[index] {
                 // This button press would overshoot the target - SKIP
-                continue;
+                continue 'button;
             }
         }
         output.push(alternative);
@@ -165,34 +156,41 @@ impl Machine {
         }
     }
 
-    fn solve_joltage(&self, max_depth: usize) -> usize {
-        let mut iteration = 0;
-        let mut search_space = vec![vec![0; self.joltage_requirements.len()]];
+    fn solve_joltage(&self) -> usize {
+        let initial = vec![0; self.joltage_requirements.len()];
+        let mut seen: HashMap<Vec<u64>, usize> = HashMap::new();
+        let mut queue = VecDeque::new();
+        queue.push_back((initial, 0));
+        let mut best_seen = usize::MAX;
 
-        loop {
-            let len = search_space.len();
-            println!("solve_joltage iteration={iteration} search_space_len={len}");
-            if iteration >= max_depth {
-                panic!("failed to solve machine within {max_depth} iterations");
+        while let Some((current_joltage, depth)) = queue.pop_front() {
+            if depth >= best_seen {
+                continue;
             }
-
-            let mut next_state = vec![];
-
-            for joltage in &search_space {
-                for alternative in
-                    joltage_alternatives(joltage, &self.buttons, &self.joltage_requirements)
-                {
-                    if alternative == self.joltage_requirements {
-                        return iteration + 1;
-                    }
-                    next_state.push(alternative);
+            if current_joltage == self.joltage_requirements {
+                println!("new best found solution at {depth} depth");
+                best_seen = depth;
+                continue;
+            }
+            if let Some(previous_depth) = seen.get(&current_joltage) {
+                if *previous_depth <= depth {
+                    println!(
+                        "current joltage at depth {depth} has been seen at {previous_depth} - skipping"
+                    );
+                    // We've been here before in equal or better steps
+                    continue;
                 }
+                // We've been here before but this time its faster, so remember this as current best.
+                seen.insert(current_joltage.clone(), depth);
             }
-
-            search_space = next_state;
-
-            iteration += 1;
+            for alternative in
+                joltage_alternatives(&current_joltage, &self.buttons, &self.joltage_requirements)
+            {
+                queue.push_front((alternative, depth + 1));
+            }
         }
+
+        best_seen
     }
 }
 
@@ -205,8 +203,14 @@ pub fn part_1(input: &str) -> String {
     sum.to_string()
 }
 
-pub fn part_2(_input: &str) -> String {
-    String::new()
+pub fn part_2(input: &str) -> String {
+    let mut sum = 0;
+    for (index, line) in input.lines().enumerate() {
+        println!("Solving machine {index}");
+        let machine = Machine::from(line);
+        sum += machine.solve_joltage();
+    }
+    sum.to_string()
 }
 
 #[cfg(test)]
@@ -247,8 +251,8 @@ mod tests {
         let m1 = Machine::from("[.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}");
         let m2 = Machine::from("[...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}");
         let m3 = Machine::from("[.###.#] (0,1,2,3,4) (0,3,4) (0,1,2,4,5) (1,2) {10,11,11,5,10,5}");
-        assert_eq!(m1.solve_joltage(10), 10);
-        assert_eq!(m2.solve_joltage(12), 12);
-        assert_eq!(m3.solve_joltage(11), 11);
+        assert_eq!(m1.solve_joltage(), 10);
+        assert_eq!(m2.solve_joltage(), 12);
+        assert_eq!(m3.solve_joltage(), 11);
     }
 }
