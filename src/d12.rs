@@ -1,19 +1,20 @@
+use itertools::Itertools;
 use std::{collections::HashSet, fmt::Display, mem::swap};
 
 type Point = (u8, u8);
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Present {
     width: u8,
     height: u8,
     parts: Vec<Point>,
 }
 
+#[derive(Clone)]
 struct Area {
     width: u8,
     height: u8,
     filled: HashSet<Point>,
-    placed: Vec<Present>,
 }
 
 impl From<&str> for Present {
@@ -64,7 +65,6 @@ impl From<&str> for Area {
             width: left.parse().unwrap(),
             height: right.parse().unwrap(),
             filled: HashSet::new(),
-            placed: vec![],
         }
     }
 }
@@ -130,6 +130,7 @@ impl Present {
         self.flip_x();
     }
 
+    #[allow(dead_code)]
     fn counter_clockwise_rotate(&mut self) {
         self.diag_flip();
         self.flip_y();
@@ -176,12 +177,12 @@ impl Present {
 }
 
 impl Area {
+    #[allow(dead_code)]
     fn new(width: u8, height: u8) -> Self {
         Self {
             width,
             height,
             filled: HashSet::new(),
-            placed: vec![],
         }
     }
 
@@ -205,19 +206,62 @@ impl Area {
         // TODO: Add outer loop with each variant
         for offset_y in 0..self.width {
             for offset_x in 0..self.height {
-                for variant in present.variants() {
-                    if self.place(offset_x, offset_y, &variant) {
-                        self.placed.push(variant);
-                        return true;
-                    }
+                if self.place(offset_x, offset_y, present) {
+                    return true;
                 }
             }
         }
         false
     }
+
+    fn try_place_variants(&self, present: &Present) -> Vec<Area> {
+        let mut output = vec![];
+        for variant in present.variants() {
+            let mut next = self.clone();
+            if next.try_place(&variant) {
+                output.push(next);
+            }
+        }
+        output
+    }
+
+    fn score(&self) -> usize {
+        let mut mx = 0;
+        let mut my = 0;
+        for (x, y) in self.filled.iter() {
+            mx = mx.max(*x as usize + 1);
+            my = my.max(*y as usize + 1);
+        }
+        mx * my - self.filled.len()
+    }
+
+    fn fit(&self, presents: &[Present]) -> Option<Area> {
+        if presents.is_empty() {
+            return Some(self.clone());
+        }
+
+        let present = &presents[0];
+        let mut nexts = self.try_place_variants(present);
+        nexts.sort_unstable_by_key(|a| a.score());
+
+        if presents.len() == 1 && !nexts.is_empty() {
+            return Some(nexts[0].clone());
+        }
+        let rest = &presents[1..];
+
+        for next in nexts {
+            for permutation in rest.iter().cloned().permutations(rest.len()) {
+                if let Some(area) = next.fit(&permutation) {
+                    return Some(area);
+                };
+            }
+        }
+
+        None
+    }
 }
 
-pub fn part_1(input: &str) -> String {
+fn parse_input(input: &str) -> (Vec<Present>, Vec<(Area, Vec<usize>)>) {
     let parts = input.split("\n\n");
     let present_strs: Vec<&str> = parts
         .clone()
@@ -230,14 +274,43 @@ pub fn part_1(input: &str) -> String {
     let puzzles_str = parts.last().unwrap();
 
     let presents: Vec<Present> = present_strs.into_iter().map(Present::from).collect();
-    let mut areas = vec![];
+    let mut area_and_requirements = vec![];
 
     for puzzle_str in puzzles_str.lines() {
-        let (area_str, requirement_str) = puzzle_str.split_once(" ").unwrap();
-        areas.push(Area::from(area_str));
+        let (area_str, requirement_str) = puzzle_str.split_once(": ").unwrap();
+        let requirements: Vec<usize> = requirement_str
+            .split_whitespace()
+            .map(|item| item.parse().unwrap())
+            .collect();
+        area_and_requirements.push((Area::from(area_str), requirements));
     }
 
-    String::new()
+    (presents, area_and_requirements)
+}
+
+fn required_presents(types: &[Present], requirements: Vec<usize>) -> Vec<Present> {
+    requirements
+        .into_iter()
+        .enumerate()
+        .filter(|(_index, count)| *count > 0)
+        .flat_map(|(index, count)| vec![types[index].clone(); count])
+        .collect()
+}
+
+pub fn part_1(input: &str) -> String {
+    let (presents, area_requirements) = parse_input(input);
+    let mut sum = 0;
+
+    for (index, (area, requirements)) in area_requirements.into_iter().enumerate() {
+        let area_presents = required_presents(&presents, requirements);
+        if let Some(fitted) = area.fit(&area_presents) {
+            println!("area {index} can fit its requirements");
+            println!("{fitted}\n");
+            sum += 1;
+        }
+    }
+
+    sum.to_string()
 }
 
 pub fn part_2(_input: &str) -> String {
