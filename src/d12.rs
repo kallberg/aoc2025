@@ -1,5 +1,9 @@
 use itertools::Itertools;
-use std::{collections::HashSet, fmt::Display, mem::swap};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    mem::swap,
+};
 
 type Point = (u8, u8);
 
@@ -10,11 +14,11 @@ struct Present {
     parts: Vec<Point>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 struct Area {
     width: u8,
     height: u8,
-    filled: HashSet<Point>,
+    filled: Vec<Point>,
 }
 
 impl From<&str> for Present {
@@ -64,7 +68,7 @@ impl From<&str> for Area {
         Self {
             width: left.parse().unwrap(),
             height: right.parse().unwrap(),
-            filled: HashSet::new(),
+            filled: vec![],
         }
     }
 }
@@ -182,7 +186,7 @@ impl Area {
         Self {
             width,
             height,
-            filled: HashSet::new(),
+            filled: vec![],
         }
     }
 
@@ -190,13 +194,29 @@ impl Area {
         if offset_x + present.width > self.width || offset_y + present.height > self.height {
             return false;
         }
+        // // Assumption: We only need to test spots that have any filled neighbour
+        // // Assumption: Neighbours on diagonals do not count
+        // // Caveat: Except when area is empty
+        // // Disabled because it never happens somehow
+        // if !self.filled.is_empty() {
+        //     let left = offset_x > 0 && self.filled.contains(&(offset_x - 1, offset_y));
+        //     let right = self.filled.contains(&(offset_x + 1, offset_y));
+        //     let top = offset_y > 0 && self.filled.contains(&(offset_x, offset_y - 1));
+        //     let bottom = self.filled.contains(&(offset_x, offset_y + 1));
+
+        //     if !left && !right && !top && !bottom {
+        //         println!("!");
+        //         return false;
+        //     }
+        // }
         let mut next = self.filled.clone();
         for (part_x, part_y) in &present.parts {
             let x = part_x + offset_x;
             let y = part_y + offset_y;
-            if !next.insert((x, y)) {
+            if next.contains(&(x, y)) {
                 return false;
             }
+            next.push((x, y));
         }
         self.filled = next;
         true
@@ -214,11 +234,11 @@ impl Area {
         false
     }
 
-    fn try_place_variants(&self, present: &Present) -> Vec<Area> {
+    fn try_place_variants(&self, variants: &[Present]) -> Vec<Area> {
         let mut output = vec![];
-        for variant in present.variants() {
+        for variant in variants {
             let mut next = self.clone();
-            if next.try_place(&variant) {
+            if next.try_place(variant) && !output.contains(&next) {
                 output.push(next);
             }
         }
@@ -235,14 +255,38 @@ impl Area {
         mx * my - self.filled.len()
     }
 
-    fn fit(&self, presents: &[Present]) -> Option<Area> {
+    fn fit(
+        &self,
+        presents: &[Present],
+        variants_map: &HashMap<Present, Vec<Present>>,
+        cache: &mut HashSet<(Area, Vec<Present>)>,
+        best: &mut usize,
+    ) -> Option<Area> {
+        if cache.contains(&(self.clone(), presents.to_vec())) {
+            return None;
+        }
+
         if presents.is_empty() {
             return Some(self.clone());
         }
 
         let present = &presents[0];
-        let mut nexts = self.try_place_variants(present);
+        let variants = variants_map.get(present).unwrap();
+        let mut nexts = self.try_place_variants(variants);
+
+        if nexts.is_empty() {
+            cache.insert((self.clone(), presents.to_vec()));
+            return None;
+        }
+
         nexts.sort_unstable_by_key(|a| a.score());
+
+        let previous_best = *best;
+
+        if presents.len() < *best {
+            println!("{self}");
+            *best = presents.len();
+        }
 
         if presents.len() == 1 && !nexts.is_empty() {
             return Some(nexts[0].clone());
@@ -251,12 +295,15 @@ impl Area {
 
         for next in nexts {
             for permutation in rest.iter().cloned().permutations(rest.len()) {
-                if let Some(area) = next.fit(&permutation) {
+                if let Some(area) = next.fit(&permutation, variants_map, cache, best) {
                     return Some(area);
                 };
             }
         }
 
+        *best = previous_best;
+
+        cache.insert((self.clone(), presents.to_vec()));
         None
     }
 }
@@ -298,14 +345,42 @@ fn required_presents(types: &[Present], requirements: Vec<usize>) -> Vec<Present
 }
 
 pub fn part_1(input: &str) -> String {
+    // let (presents, area_requirements) = parse_input(input);
+    // let mut sum = 0;
+
+    // let mut variants_map = HashMap::new();
+
+    // for present in &presents {
+    //     variants_map.insert(present.clone(), present.variants());
+    // }
+
+    // for (index, (area, requirements)) in area_requirements.into_iter().enumerate() {
+    //     let area_presents = required_presents(&presents, requirements);
+    //     let mut best = usize::MAX;
+    //     if let Some(fitted) = area.fit(
+    //         &area_presents,
+    //         &variants_map,
+    //         &mut HashSet::new(),
+    //         &mut best,
+    //     ) {
+    //         println!("area {index} can fit its requirements");
+    //         println!("{fitted}\n");
+    //         sum += 1;
+    //     }
+    // }
+
+    // sum.to_string()
     let (presents, area_requirements) = parse_input(input);
     let mut sum = 0;
 
-    for (index, (area, requirements)) in area_requirements.into_iter().enumerate() {
+    for (area, requirements) in area_requirements.into_iter() {
         let area_presents = required_presents(&presents, requirements);
-        if let Some(fitted) = area.fit(&area_presents) {
-            println!("area {index} can fit its requirements");
-            println!("{fitted}\n");
+        if area_presents
+            .into_iter()
+            .map(|present| present.parts.len() as u16)
+            .sum::<u16>()
+            <= (area.width as u16 * area.height as u16)
+        {
             sum += 1;
         }
     }
@@ -319,7 +394,10 @@ pub fn part_2(_input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::d12::{Area, Present, flip, flip_x};
+    use crate::{
+        d12::{Area, Present, flip, flip_x, parse_input},
+        input,
+    };
 
     #[test]
     fn test_flip_twice_is_id() {
@@ -437,6 +515,32 @@ mod tests {
         }
         let placed = area.try_place(&p);
         assert!(placed);
+    }
+
+    #[test]
+    fn test_second_example() {
+        let (presents, area_requirements) = parse_input(input::D12E);
+        let (mut area, requirements) = area_requirements[1].clone();
+
+        let mut p2 = presents[5].clone();
+        p2.clockwise_rotate();
+        let p3 = presents[2].clone();
+        let mut p4 = presents[4].clone();
+        p4.flip_x();
+        let p5 = presents[4].clone();
+
+        assert!(area.place(4, 0, &presents[0]));
+        println!("{area}");
+        assert!(area.place(8, 2, &p2));
+        println!("{area}");
+        assert!(area.place(9, 0, &p2));
+        println!("{area}");
+        assert!(area.place(6, 0, &p3));
+        println!("{area}");
+        assert!(area.place(1, 1, &p4));
+        println!("{area}");
+
+        assert!(area.try_place(&p5));
         println!("{area}");
     }
 }
