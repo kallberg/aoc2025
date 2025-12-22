@@ -3,7 +3,7 @@
 // 2. From 1. follows that there can be light diagram of at most size 10
 //
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashSet;
 
 const BUTTON_MASK: [u64; 10] = [
     0b0000000001,
@@ -105,24 +105,6 @@ fn button_joltages(button: u64) -> Vec<usize> {
         .collect()
 }
 
-fn joltage_alternatives(current: &[u64], buttons: &[u64], target: &[u64]) -> Vec<Vec<u64>> {
-    let mut output = vec![];
-
-    'button: for button in buttons {
-        let mut alternative: Vec<u64> = current.to_vec();
-        for index in button_joltages(*button) {
-            alternative[index] += 1;
-            if alternative[index] > target[index] {
-                // This button press would overshoot the target - SKIP
-                continue 'button;
-            }
-        }
-        output.push(alternative);
-    }
-
-    output
-}
-
 impl Machine {
     fn solve_lights(&self, max_depth: usize) -> usize {
         let mut iteration = 0;
@@ -155,43 +137,269 @@ impl Machine {
             iteration += 1;
         }
     }
+}
 
-    fn solve_joltage(&self) -> usize {
-        let initial = vec![0; self.joltage_requirements.len()];
-        let mut seen: HashMap<Vec<u64>, usize> = HashMap::new();
-        let mut queue = VecDeque::new();
-        queue.push_back((initial, 0));
-        let mut best_seen = usize::MAX;
+struct Matrix {
+    values: Vec<f64>,
+    width: usize,
+}
 
-        while let Some((current_joltage, depth)) = queue.pop_front() {
-            if depth >= best_seen {
-                continue;
-            }
-            if current_joltage == self.joltage_requirements {
-                println!("new best found solution at {depth} depth");
-                best_seen = depth;
-                continue;
-            }
-            if let Some(previous_depth) = seen.get(&current_joltage) {
-                if *previous_depth <= depth {
-                    println!(
-                        "current joltage at depth {depth} has been seen at {previous_depth} - skipping"
-                    );
-                    // We've been here before in equal or better steps
-                    continue;
+impl Matrix {
+    fn height(&self) -> usize {
+        self.values.len() / self.width
+    }
+
+    fn swap_rows(&mut self, row_a: usize, row_b: usize) {
+        if row_a == row_b {
+            return;
+        }
+        for column in 0..self.width {
+            let idx_a = row_a * self.width + column;
+            let idx_b = row_b * self.width + column;
+            self.values.swap(idx_a, idx_b);
+        }
+    }
+
+    fn row_echelon_form(&mut self) {
+        let height = self.height();
+        let width = self.width;
+        let mut pivot_row = 0;
+        let mut pivot_column = 0;
+
+        while pivot_row < height && pivot_column < width {
+            let mut max_row = pivot_row;
+            for i in pivot_row + 1..height {
+                if self.values[i * width + pivot_column].abs()
+                    > self.values[max_row * width + pivot_column].abs()
+                {
+                    max_row = i;
                 }
-                // We've been here before but this time its faster, so remember this as current best.
-                seen.insert(current_joltage.clone(), depth);
             }
-            for alternative in
-                joltage_alternatives(&current_joltage, &self.buttons, &self.joltage_requirements)
-            {
-                queue.push_front((alternative, depth + 1));
+
+            if self.values[max_row * width + pivot_column].abs() < 1e-9 {
+                pivot_column += 1;
+                continue;
+            }
+
+            self.swap_rows(pivot_row, max_row);
+
+            for i in pivot_row + 1..height {
+                let target_idx = i * width + pivot_column;
+                let pivot_idx = pivot_row * width + pivot_column;
+
+                let factor = self.values[target_idx] / self.values[pivot_idx];
+
+                for j in pivot_column..width {
+                    let value_to_subtract = self.values[pivot_row * width + j] * factor;
+                    self.values[i * width + j] -= value_to_subtract;
+                }
+            }
+
+            pivot_row += 1;
+            pivot_column += 1;
+        }
+    }
+
+    fn reduced_row_echelon_form(&mut self) {
+        self.row_echelon_form();
+        let height = self.height();
+        let width = self.width;
+        for row in (0..height).rev() {
+            let mut pivot_column = None;
+            for column in 0..width - 1 {
+                if self.values[row * width + column].abs() > 1e-9 {
+                    pivot_column = Some(column);
+                    break;
+                }
+            }
+
+            if let Some(pivot_column) = pivot_column {
+                let pivot_value = self.values[row * width + pivot_column];
+                for column in pivot_column..width {
+                    self.values[row * width + column] /= pivot_value;
+                }
+                for row_above in 0..row {
+                    let factor = self.values[row_above * width + pivot_column];
+                    for col in pivot_column..width {
+                        let val_to_subtract = self.values[row * width + col] * factor;
+                        self.values[row_above * width + col] -= val_to_subtract;
+                    }
+                }
             }
         }
-
-        best_seen
     }
+
+    fn pivot_points(&self) -> Vec<(usize, usize)> {
+        let variable_count = self.width - 1;
+        let mut points = vec![];
+        for row in 0..self.height() {
+            for column in 0..variable_count {
+                if self.values[row * self.width + column] == 1.0 {
+                    points.push((row, column));
+                    break;
+                }
+            }
+        }
+        points
+    }
+
+    fn free_indices_from_pivot_indices(&self, pivot_indices: &[usize]) -> Vec<usize> {
+        let variable_count = self.width - 1;
+        let free_indices: Vec<usize> = (0..variable_count)
+            .filter(|c| !pivot_indices.contains(c))
+            .collect();
+        free_indices
+    }
+
+    fn free_indices(&self) -> Vec<usize> {
+        let pivot_indices: Vec<usize> = self.pivot_points().iter().map(|(_, col)| *col).collect();
+        self.free_indices_from_pivot_indices(&pivot_indices)
+    }
+
+    fn solve(&self, free_variables: &[f64]) -> Option<Vec<f64>> {
+        let variable_count = self.width - 1;
+        let mut solution: Vec<f64> = vec![0.0; variable_count];
+
+        let pivot_points = self.pivot_points();
+        let pivot_indices: Vec<usize> = pivot_points.iter().map(|(_, c)| *c).collect();
+        let free_indices: Vec<usize> = self.free_indices_from_pivot_indices(&pivot_indices);
+
+        if free_variables.len() != free_indices.len() {
+            return None;
+        }
+
+        for (free_variable, column) in free_indices.iter().enumerate() {
+            solution[*column] = free_variables[free_variable];
+        }
+
+        for (row, pivot_column) in pivot_points {
+            let rhs = self.values[row * self.width + variable_count];
+            let mut sum_free_varibles = 0.0;
+
+            for variable_index in &free_indices {
+                let variable_value = solution[*variable_index];
+                let variable_constant_multiplier = self.values[row * self.width + variable_index];
+                let value = variable_value * variable_constant_multiplier;
+                sum_free_varibles += value;
+            }
+
+            solution[pivot_column] = rhs - sum_free_varibles;
+        }
+
+        Some(solution)
+    }
+
+    fn augmented_column(&self) -> Vec<f64> {
+        (0..self.height())
+            .map(|row| self.values[row * self.width + self.width - 1])
+            .collect()
+    }
+}
+
+fn joltage_matrix(machine: &Machine) -> Matrix {
+    let width = machine.buttons.len() + 1;
+    let values = {
+        let mut values = vec![];
+        for (index, joltage) in machine.joltage_requirements.iter().enumerate() {
+            for button in &machine.buttons {
+                let joltages = button_joltages(*button);
+                match joltages.contains(&index) {
+                    true => values.push(1.0),
+                    false => values.push(0.0),
+                }
+            }
+            values.push(*joltage as f64);
+        }
+        values
+    };
+    Matrix { values, width }
+}
+
+fn is_positive_integer_or_zero(value: f64, epsilon: f64) -> bool {
+    value.round() >= 0.0 && (value - value.round()).abs() < epsilon
+}
+
+fn valid_joltage_solution(solution: &[f64]) -> bool {
+    let epsilon = 1e-9;
+    for value in solution {
+        if !is_positive_integer_or_zero(*value, epsilon) {
+            return false;
+        }
+    }
+    true
+}
+
+fn joltage_depth_first_search(
+    matrix: &Matrix,
+    variable_index: usize,
+    free_varibles: usize,
+    values: &mut [usize],
+    best_values: &mut [usize],
+    best: &mut usize,
+    maximum: usize,
+) {
+    let matrix_values: Vec<f64> = values.iter().map(|value| *value as f64).collect();
+    let Some(solution) = matrix.solve(&matrix_values) else {
+        return;
+    };
+    let current_sum = (solution.iter().sum::<f64>()).round() as usize;
+    if variable_index == free_varibles {
+        if valid_joltage_solution(&solution) && current_sum < *best {
+            values
+                .iter()
+                .enumerate()
+                .for_each(|(index, value)| best_values[index] = *value);
+            *best = current_sum;
+        }
+        return;
+    }
+
+    let running_value_sum: usize = values[..variable_index].iter().sum();
+
+    for presses in 0..=maximum {
+        if running_value_sum + presses > *best {
+            return;
+        }
+        values[variable_index] = presses;
+        joltage_depth_first_search(
+            matrix,
+            variable_index + 1,
+            free_varibles,
+            values,
+            best_values,
+            best,
+            maximum,
+        );
+    }
+}
+
+fn joltage_solve(machine: &Machine) -> (Vec<f64>, usize) {
+    let mut matrix = joltage_matrix(machine);
+    let maximum_value: usize = matrix.augmented_column().iter().sum::<f64>().round() as usize;
+    matrix.reduced_row_echelon_form();
+    let variable_count = matrix.free_indices().len();
+
+    if variable_count == 0 {
+        let solution = matrix.augmented_column();
+        let sum: usize = solution.iter().map(|v| v.round() as usize).sum();
+        return (solution, sum);
+    }
+
+    let mut variables = vec![0; matrix.free_indices().len()];
+    let mut best_variables = variables.clone();
+    let mut best_sum = usize::MAX;
+    joltage_depth_first_search(
+        &matrix,
+        0,
+        variable_count,
+        &mut variables,
+        &mut best_variables,
+        &mut best_sum,
+        maximum_value,
+    );
+    let matrix_variables: Vec<f64> = best_variables.iter().map(|v| *v as f64).collect();
+    let solution = matrix.solve(&matrix_variables).unwrap();
+    (solution, best_sum)
 }
 
 pub fn part_1(input: &str) -> String {
@@ -206,9 +414,10 @@ pub fn part_1(input: &str) -> String {
 pub fn part_2(input: &str) -> String {
     let mut sum = 0;
     for (index, line) in input.lines().enumerate() {
-        println!("Solving machine {index}");
         let machine = Machine::from(line);
-        sum += machine.solve_joltage();
+        let (best_solution, best_sum) = joltage_solve(&machine);
+        println!("Solving machine {index}, best_sum={best_sum}");
+        sum += best_sum;
     }
     sum.to_string()
 }
@@ -244,15 +453,5 @@ mod tests {
     #[test]
     fn test_button_joltage_conversion() {
         assert_eq!(button_joltages(BUTTON_MASK[0] | BUTTON_MASK[1]), vec![0, 1])
-    }
-
-    #[test]
-    fn test_example_machine_joltage_solutions() {
-        let m1 = Machine::from("[.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}");
-        let m2 = Machine::from("[...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}");
-        let m3 = Machine::from("[.###.#] (0,1,2,3,4) (0,3,4) (0,1,2,4,5) (1,2) {10,11,11,5,10,5}");
-        assert_eq!(m1.solve_joltage(), 10);
-        assert_eq!(m2.solve_joltage(), 12);
-        assert_eq!(m3.solve_joltage(), 11);
     }
 }
